@@ -9,7 +9,10 @@ Diese Schaltung (Bild 1) ersetzt den Limiter zur Leistungsvorgabe und wird auch 
 
 Bild 1: Schaltung
 <img src="https://github.com/matlen67/soyosource-weblimiter/blob/main/images/wiring_nodemcu_rs485.png" width="512">
-<img src="[https://github.com/matlen67/soyosource-weblimiter/blob/main/images/wiring_nodemcu_rs485.png](https://github.com/matlen67/soyosource-weblimiter/blob/main/images/display_setup.jpg)" width="512">
+
+Bild 2: Einstellmenü
+Hier muss Bat AutoLimit Grid auf Y stehen
+<img src="https://github.com/matlen67/soyosource-weblimiter/blob/main/images/display_setup.jpg" width="256">
   
 
 

@@ -7,13 +7,18 @@ Der SoyoSource Einspeisewechselrichter kann die zu wandelnde Energie (DC-Seitig)
 
 Diese Schaltung (Bild 1) ersetzt den Limiter zur Leistungsvorgabe und wird auch an der RS485 Schnittstelle angeschlossen. Damit die Leistungsvorgabe der Schaltung funktioniert muss im Einstellmenü der Limitermode aktiviert werden (Bild 2) 
 
-Bild 1: Schaltung
+## Bild 1: Schaltung
+
 <img src="https://github.com/matlen67/soyosource-weblimiter/blob/main/images/wiring_nodemcu_rs485.png" width="512">
 
-Bild 2: Einstellmenü
-Hier muss Bat AutoLimit Grid auf Y stehen
+## Bild 2: Einstellmenü
+
+Hier muss 'Bat AutoLimit Grid' auf Y stehen
+
 <img src="https://github.com/matlen67/soyosource-weblimiter/blob/main/images/display_setup.jpg" width="256">
   
+
+
 
 
 

@@ -12,6 +12,8 @@ Diese Schaltung (Bild 1) ersetzt den Limiter zur Leistungsvorgabe und wird an de
 - NodeMCU mit ESP8266 (ESP-12F) (4MB Flash)
 - RS485 Entwicklungsboard TTL zu RS485, MAX485
 
+Hinweis: Das RS485 Etwicklungsboard verwenden einen Max485 Pegelwandler der für eine Versorgungsspannung von 5V ausgelegt ist. Da die GPIO's des ESP8266 dauerhaft nur 3.3V vertragen wird die Spannung Vcc vom RS485 Entwicklungsboard am 3.3V Ausgang des NodeMCU abgegriffen. Das RS485 Etwicklungsboard arbeitet auch zuverlässig mit 3.3V. Die 5V Spannungsversorgung des NodeMCU kann entweder über USB oder den PIN VIN erfolgen.
+
 ### Bild 1
 <img src="https://github.com/matlen67/soyosource-weblimiter/blob/main/images/wiring_nodemcu_rs485.png" width="512">
 

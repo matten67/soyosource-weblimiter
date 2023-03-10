@@ -8,6 +8,12 @@ Der SoyoSource Einspeisewechselrichter kann die zu wandelnde Energie (DC-Seitig)
 Diese Schaltung (Bild 1) ersetzt den Limiter zur Leistungsvorgabe und wird an der RS485 Schnittstelle des SoyoSouce angeschlossen. Damit die Leistungsvorgabe der Schaltung funktioniert muss im Einstellmenü der Limitermode aktiviert werden (Bild 2).
 
 Gleich als Hinweis. In den aktuellen Versionen der Geräte gibt der Soyosource keine Daten über die RS485 aus, somit ist ein Auslesen von verschiedenen Informationen aktuell nicht möglich. Leider liegen mir aktuell keine Informationen vor ob der Sendevorgang per Software/Hardware deaktiviert wurde oder es nur neue Parameter bedarf um den Soyo zum Sprechen zu bewegen kann. Aktuell sende ich per Schleife alle möglichen Byte-Reihenfolgen zum SoyoSoure um zu testen ob er irgendwann einmal antwortet.   
+## Arduino IDE 2.0.4
+#Library Github
+ - ESPAsync_WiFiManager (https://github.com/khoih-prog/ESPAsync_WiFiManager)
+ - ESPAsyncWebServer    (https://github.com/me-no-dev/ESPAsyncWebServer)
+ - ESPAsyncTCP          (https://github.com/me-no-dev/ESPAsyncTCP)
+
 
 ## Schaltung
 ### Bauteile

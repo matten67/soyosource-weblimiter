@@ -1,6 +1,6 @@
 /***************************************************************************
   soyosource web-limiter v1.0
-  @matlen67 - 12.02.2023
+  @matlen67 - 24.04.2023
 
   Wiring
   NodeMCU D1 - RS485 RO
@@ -21,7 +21,8 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <AsyncElegantOTA.h>
-#include <Uptime.h>  
+#include <Uptime.h>
+#include <time.h>
 
 #define DEBUG false
 
@@ -36,27 +37,25 @@
 #define SERIAL_COMMUNICATION_CONTROL_PIN D3 // Transmission set pin (D3)
 #define RS485_TX_PIN_VALUE HIGH
 #define RS485_RX_PIN_VALUE LOW
+
+#define MY_NTP_SERVER "de.pool.ntp.org"           
+#define MY_TZ "CET-1CEST,M3.5.0/02,M10.5.0/03"   
  
 SoftwareSerial RS485Serial(RXPin, TXPin); // RX, TX
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-Uptime uptime;
 // Uptime Global Variables
+Uptime uptime;
 uint8_t Uptime_Years = 0U, Uptime_Months = 0U, Uptime_Days = 0U, Uptime_Hours = 0U, Uptime_Minutes = 0U, Uptime_Seconds = 0U;
 uint16_t Uptime_TotalDays = 0U; // Total Uptime Days
 char Uptime_Str[37];  
 
 //Timer
 unsigned long lastTime1 = 0;  
-unsigned long timerDelay1 = 500;  // send readings timer
+unsigned long timerDelay1 = 1000;  // send readings timer
 
-unsigned long lastTime2 = 0;  
-unsigned long timerDelay2 = 1000;  // send readings timer
-
-unsigned long lastTime3 = 0;  
-unsigned long timerDelay3 = 60000;  // send readings timer
 
 String msg = "";
 char msgData[20];
@@ -87,12 +86,23 @@ int cur_power;
 bool newData = false;
 int value_power = 0;
 unsigned char mac[6];
-String clientId;
-String topic_alive;
-String topic_power;
-String soyo_text;
+
+
+char topic_root[40] = "SoyoSource/";
+char clientId[40] ="soyo_";
+char alive[40] = "/alive";
+char power[40] = "/power";
+
+char topic_alive[40];
+char topic_power[40];
+char soyo_text[40];
 
 long rssi;
+
+time_t now;                       
+tm tm;
+
+char currentTime[20];
 
 
 AsyncWebServer server(80);
@@ -130,6 +140,7 @@ String processor(const String& var){
       return String(clientId);
     }
     else if(var == "UPTIME"){
+      myUptime();
       return Uptime_Str;
     }
     else if(var == "SOYOTEXT"){
@@ -144,13 +155,14 @@ void reconnect() {
   while (!client.connected()) {
     DEBUG_SERIAL.println("Attempting MQTT connection...");
    
-    if (client.connect(clientId.c_str())) {
-      DEBUG_SERIAL.println("connected");
-      client.publish(topic_alive.c_str(), "1");
-      client.publish(topic_power.c_str(), "0"); //power 0 watt
-      client.subscribe(topic_power.c_str());    // subscripe topic
+    if (client.connect(clientId)) {
+      DEBUG_SERIAL.println("reconnect: connected");
+      client.publish(topic_alive, "1");
+      client.publish(topic_power, "0"); //set power 0 watt
+      client.subscribe(topic_power);    // subscripe topic
     } else {
-      delay(3000);
+      DEBUG_SERIAL.print("reconnect: error! ");
+      delay(5000);
     }
   }
 }
@@ -162,9 +174,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   DEBUG_SERIAL.print(topic);
   DEBUG_SERIAL.print(" ");
   bool isNumber = true;
-  String topicString(topic);
+  //String topicString(topic);
 
-  if(topicString == topic_power){
+  if(String(topic) == topic_power){
 
     for (int i=0;i<length;i++) {
       DEBUG_SERIAL.print((char)payload[i]);
@@ -203,6 +215,7 @@ int calc_checksumme(int b1, int b2, int b3, int b4, int b5, int b6 ){
   return calc & 0xFF;
 }
 
+
 void myUptime(){
   uptime.calculateUptime();                                  
 
@@ -218,32 +231,67 @@ void myUptime(){
   if (Uptime_Years == 0U) {                                  // Uptime Is Less Than One Year
     // First 60 Seconds
     if (Uptime_Minutes == 0U && Uptime_Hours == 0U && Uptime_Days == 0U && Uptime_Months == 0U)
-      sprintf(Uptime_Str, "%i sec", Uptime_Seconds);
+      sprintf(Uptime_Str, "00:00:%02i", Uptime_Seconds);
     // First Minute
     else if (Uptime_Minutes == 1U && Uptime_Hours == 0U && Uptime_Days == 0U && Uptime_Months == 0U)
-      sprintf(Uptime_Str, "%i min", Uptime_Minutes);
+      sprintf(Uptime_Str, "00:%02i:%02i", Uptime_Minutes, Uptime_Seconds);
     // Second Minute And More But Less Than Hours, Days, Months
     else if (Uptime_Minutes >= 2U && Uptime_Hours == 0U && Uptime_Days == 0U && Uptime_Months == 0U)
-      sprintf(Uptime_Str, "%i min", Uptime_Minutes);
+      sprintf(Uptime_Str, "00:%02i:%02i", Uptime_Minutes, Uptime_Seconds);
     // First Hour And More But Less Than Days, Months
     else if (Uptime_Hours >= 1U && Uptime_Days == 0U && Uptime_Months == 0U)
-      sprintf(Uptime_Str, "%i std %i min", Uptime_Hours, Uptime_Minutes);
+      sprintf(Uptime_Str, "%02i:%02i:%02i", Uptime_Hours, Uptime_Minutes, Uptime_Seconds);
     // First Day And Less Than Month
     else if (Uptime_Days == 1U && Uptime_Months == 0U)
-      sprintf(Uptime_Str, "%i day %02i:%02i", Uptime_Days, Uptime_Hours, Uptime_Minutes);
+      sprintf(Uptime_Str, "%iday %02i:%02i:%02i", Uptime_Days, Uptime_Hours, Uptime_Minutes, Uptime_Seconds);
     // Second Day And More But Less Than Month
     else if (Uptime_Days >= 2U && Uptime_Months == 0U)
-      sprintf(Uptime_Str, "%i days %02i:%02i", Uptime_Days, Uptime_Hours, Uptime_Minutes);
+      sprintf(Uptime_Str, "%idays %02i:%02i:%02i", Uptime_Days, Uptime_Hours, Uptime_Minutes, Uptime_Seconds);
     // First Month And More But Less Than One Year
     else if (Uptime_Months >= 1U)
-      sprintf(Uptime_Str, "%i m, %i d %02i:%02i", Uptime_Months, Uptime_Days, Uptime_Hours, Uptime_Minutes);
+      sprintf(Uptime_Str, "%im, %id %02i:%02i", Uptime_Months, Uptime_Days, Uptime_Hours, Uptime_Minutes);
     // If There Is Any Error In This If Loop Then Make Full String.
-    else sprintf(Uptime_Str, "%i y %i m %i d %02i:%02i", Uptime_Years, Uptime_Months, Uptime_Days, Uptime_Hours, Uptime_Minutes);
+    else sprintf(Uptime_Str, "%iy %im %id %02i:%02i", Uptime_Years, Uptime_Months, Uptime_Days, Uptime_Hours, Uptime_Minutes);
   } else                                                     // Uptime Is More Than One Year
-    sprintf(Uptime_Str, "%i y %i m %i d %02i:%02i", Uptime_Years, Uptime_Months, Uptime_Days, Uptime_Hours, Uptime_Minutes);
+    sprintf(Uptime_Str, "%iy %im %id %02i:%02i", Uptime_Years, Uptime_Months, Uptime_Days, Uptime_Hours, Uptime_Minutes);
 
 }
 
+
+void showTime() {
+  time(&now);                       // read the current time
+  localtime_r(&now, &tm);           // update the structure tm with the current time
+  Serial.print("year:");
+  Serial.print(tm.tm_year + 1900);  // years since 1900
+  Serial.print("\tmonth:");
+  Serial.print(tm.tm_mon + 1);      // January = 0 (!)
+  Serial.print("\tday:");
+  Serial.print(tm.tm_mday);         // day of month
+  Serial.print("\thour:");
+  Serial.print(tm.tm_hour);         // hours since midnight  0-23
+  Serial.print("\tmin:");
+  Serial.print(tm.tm_min);          // minutes after the hour  0-59
+  Serial.print("\tsec:");
+  Serial.print(tm.tm_sec);          // seconds after the minute  0-61*
+  Serial.print("\twday");
+  Serial.print(tm.tm_wday);         // days since Sunday 0-6
+  if (tm.tm_isdst == 1)             // Daylight Saving Time flag
+    Serial.print("\tDST");
+  else
+    Serial.print("\tstandard");
+  Serial.println();
+}
+
+
+void createTimeString(){
+  time(&now);                       // read the current time
+  localtime_r(&now, &tm);  
+
+  sprintf(currentTime, "%d.%d.%d %02d:%02d:%02d", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec );
+  
+  DEBUG_SERIAL.print("Datum Uhrzeit: ");
+  DEBUG_SERIAL.println(currentTime);
+}
 
 
 void setup()  {
@@ -255,10 +303,24 @@ void setup()  {
   DEBUG_SERIAL.println("Start");
   DEBUG_SERIAL.printf("ESP_%02X%02X%02x", mac[3], mac[4], mac[5]);
   DEBUG_SERIAL.println();
+
+  configTime(MY_TZ, MY_NTP_SERVER);
   
-  clientId = "soyo_"+ String(mac[3], HEX) + String(mac[4], HEX) + String(mac[5], HEX);
-  topic_alive = "SoyoSource/soyo_" + String(mac[3], HEX) + String(mac[4], HEX) + String(mac[5], HEX) + "/alive";
-  topic_power = "SoyoSource/soyo_" + String(mac[3], HEX) + String(mac[4], HEX) + String(mac[5], HEX) + "/power";
+  String myid = String(mac[3], HEX) + String(mac[4], HEX) + String(mac[5], HEX);
+  
+  //generate espid in hex like soyo_18d88d
+ 
+  //clientId = "soyo_";
+  strcat(clientId, myid.c_str());
+  
+  strcat(topic_alive, topic_root);
+  strcat(topic_alive, clientId);
+  strcat(topic_alive, "/alive");
+
+  //topic_power = "SoyoSource/soyo_";
+  strcat(topic_power, topic_root);
+  strcat(topic_power, clientId);
+  strcat(topic_power, "/power");
 
   DEBUG_SERIAL.println(topic_alive);
   
@@ -385,7 +447,7 @@ void setup()  {
 
     client.setServer(mqtt_server, atoi(mqtt_port));
     client.setCallback(callback);
-    client.publish(topic_alive.c_str(), "0");
+    client.publish(topic_alive, "0");
 
     // Handle Web Server
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -404,7 +466,7 @@ void setup()  {
     server.on("/set_0", HTTP_GET, [](AsyncWebServerRequest *request) {
       value_power = 0;
       sprintf(msgData, "%d",value_power);
-      client.publish(topic_power.c_str(), msgData);
+      client.publish(topic_power, msgData);
       newData = true;
       request->send_P(200, "text/html", index_html, processor);
     });
@@ -414,7 +476,7 @@ void setup()  {
     server.on("/plus1", HTTP_GET, [](AsyncWebServerRequest *request) {
       value_power +=1;
       sprintf(msgData, "%d",value_power);
-      client.publish(topic_power.c_str(), msgData);
+      client.publish(topic_power, msgData);
       newData = true;
       request->send_P(200, "text/html", index_html, processor);
     });
@@ -423,7 +485,7 @@ void setup()  {
     server.on("/plus10", HTTP_GET, [](AsyncWebServerRequest *request) {
       value_power +=10;
       sprintf(msgData, "%d",value_power);
-      client.publish(topic_power.c_str(), msgData);
+      client.publish(topic_power, msgData);
       newData = true;
       request->send_P(200, "text/html", index_html, processor);
     });
@@ -435,7 +497,7 @@ void setup()  {
         value_power = 0;
       }
       sprintf(msgData, "%d",value_power);
-      client.publish(topic_power.c_str(), msgData);
+      client.publish(topic_power, msgData);
       newData = true;
       request->send_P(200, "text/html", index_html, processor);
       
@@ -448,7 +510,7 @@ void setup()  {
         value_power = 0;
       }
       sprintf(msgData, "%d",value_power);
-      client.publish(topic_power.c_str(), msgData);
+      client.publish(topic_power, msgData);
       newData = true;
       request->send_P(200, "text/html", index_html, processor);
     });
@@ -461,6 +523,13 @@ void setup()  {
       ESP.restart();
       request->send_P(200, "text/html", index_html, processor);
     });
+
+    // restart system
+    server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request) {     
+      ESP.restart();
+      request->send_P(200, "text/html", index_html, processor);
+    });
+
 
    
     AsyncElegantOTA.begin(&server);    // Start AsyncElegantOTA
@@ -476,6 +545,8 @@ void setup()  {
 
     myUptime();
     events.send(Uptime_Str,"uptime", millis());
+
+    digitalWrite(SERIAL_COMMUNICATION_CONTROL_PIN, RS485_TX_PIN_VALUE); // Init transmit
     
   }
 
@@ -490,29 +561,32 @@ void loop() {
   }
   client.loop();
 
+  //the new firmware does not send any data!
   //receive data from soyo
-  digitalWrite(SERIAL_COMMUNICATION_CONTROL_PIN, RS485_RX_PIN_VALUE); // Init receive
-  if (RS485Serial.available() >= 8){
-    for(int i=0; i<8; i++){
-      data_array[i] = RS485Serial.read();
-    }
-    soyo_text = String(data_array[0], HEX) + " " + String(data_array[1], HEX) + " " + String(data_array[2], HEX) + " " +  String(data_array[3], HEX ) + " " + String(data_array[4], HEX) + " " + String(data_array[5], HEX) + " " + String(data_array[6], HEX) + " " + String(data_array[7], HEX);
-    events.send(String(soyo_text).c_str(),"soyotext", millis());
+  // digitalWrite(SERIAL_COMMUNICATION_CONTROL_PIN, RS485_RX_PIN_VALUE); // Init receive
+  // if (RS485Serial.available() >= 8){
+  //   for(int i=0; i<8; i++){
+  //     data_array[i] = RS485Serial.read();
+  //   }
+  //   soyo_text = String(data_array[0], HEX) + " " + String(data_array[1], HEX) + " " + String(data_array[2], HEX) + " " +  String(data_array[3], HEX ) + " " + String(data_array[4], HEX) + " " + String(data_array[5], HEX) + " " + String(data_array[6], HEX) + " " + String(data_array[7], HEX);
+  //   events.send(String(soyo_text).c_str(),"soyotext", millis());
 
-    DEBUG_SERIAL.println();
+  //   DEBUG_SERIAL.println();
     
-  }
+  // }
       
     
-  //send power to SoyoSource every 500ms
+  //send power to SoyoSource every 1000ms
   if ((millis() - lastTime1) > timerDelay1) {
-    digitalWrite(SERIAL_COMMUNICATION_CONTROL_PIN, RS485_TX_PIN_VALUE); // Init transmit
+    //digitalWrite(SERIAL_COMMUNICATION_CONTROL_PIN, RS485_TX_PIN_VALUE); // Init transmit
 
     if(newData == true && value_power >=0){
       setSoyoPowerData(value_power);
+      events.send(String(value_power).c_str(),"staticpower",millis()); // nur an Website senden wenn es ein update vom Power_value gibt! neu 23.04.2023
       newData = false;
     }
     
+    //daten an RS485 senden
     for(int i=0; i<8; i++){
       RS485Serial.write(soyo_power_data[i]);
       DEBUG_SERIAL.print(soyo_power_data[i], HEX);
@@ -520,32 +594,14 @@ void loop() {
     }
 
     DEBUG_SERIAL.println();
-    events.send(String(value_power).c_str(),"staticpower",millis());
-    
+   
+    client.publish(topic_alive, "1");
+   
+      
     lastTime1 = millis();
   }
 
 
-  //every 1000ms mqtt publish alive
-  if ((millis() - lastTime2) > timerDelay2) {   
-    client.publish(topic_alive.c_str(), "1");
-
-    lastTime2 = millis();
-  }
-
-
-  //every 60000ms update webif (rssi / uptime)
-  if ((millis() - lastTime3) > timerDelay3) {
-    DEBUG_SERIAL.println(String(WiFi.RSSI()));
-
-    rssi = WiFi.RSSI();
-    events.send(String(rssi).c_str(), "wifirssi", millis());
-
-    myUptime();
-    events.send(Uptime_Str,"uptime", millis());
-    
-    lastTime3 = millis();
-  }
  
    
 }
